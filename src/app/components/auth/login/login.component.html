@@ -1,0 +1,31 @@
+<section>
+    <form [formGroup]="loginForm"
+    (ngSubmit)="onSubmit()"
+    fxLayout="column"
+    fxLayoutAlign="center center"
+    fxLayoutGap="10px">
+      <mat-form-field>
+          <input matInput
+          placeholder="Enter your Email"
+          required
+          formControlName="email">
+          <mat-hint>Please enter a valid Email</mat-hint>
+          <mat-error>Invalid or Missing Email</mat-error>
+      </mat-form-field>
+
+      <mat-form-field>
+        <input matInput
+        placeholder="Password"
+        required
+        formControlName="password">
+        <mat-hint>Please enter Your Password</mat-hint>
+        <mat-error>Invalid or Missing Email</mat-error>
+    </mat-form-field>
+
+    <button mat-raised-button
+    color="primary"
+    type="submit"
+    [disabled]="loginForm.invalid">Login</button>
+
+    </form>
+</section>
