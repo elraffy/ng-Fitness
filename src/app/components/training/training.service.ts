@@ -28,13 +28,17 @@ export class TrainingService{
              return{
                id: doc.payload.doc.id,
                ...doc.payload.doc.data() as Exercise
-             }
-           })
+             };
+           });
          })
        ).subscribe((exercises: Exercise[]) =>{
               this.uiService.loadingStateChanged.next(false);
               this.availableExercises = exercises;
               this.exercisesChanged.next([...this.availableExercises]);
+       }, error => {
+           this.uiService.loadingStateChanged.next(false);
+           this.uiService.showSnarckbar('Fetching exercises failed, please try later', null, 300);
+           this.exercisesChanged.next([...this.availableExercises])
        }));
   }
   startExercise(selectedId: string){
