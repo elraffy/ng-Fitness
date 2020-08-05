@@ -7,6 +7,8 @@ import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MaterialModule } from './material.module';
 import { AuthModule } from './components/auth/auth.module';
+import { StoreModule } from '@ngrx/store';
+import { reducers } from './app.reducer';
 //import { TrainingModule } from './components/training/training.module';
 
 
@@ -25,6 +27,8 @@ import { environment } from '../environments/environment.prod';
 //import { AngularFireAuthModule } from '@angular/fire/auth';
 import { UIService } from './shared/ui.service';
 import { AngularFirestoreModule } from '@angular/fire/firestore';
+import { ServiceWorkerModule } from '@angular/service-worker';
+
 
 
 @NgModule({
@@ -45,8 +49,9 @@ import { AngularFirestoreModule } from '@angular/fire/firestore';
     ReactiveFormsModule,
     AngularFireModule.initializeApp(environment.firebase),
     AuthModule,
-    AngularFirestoreModule
-    //TrainingModule
+    AngularFirestoreModule,
+    StoreModule.forRoot(reducers),
+    ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production })
 
   ],
   providers: [AuthService, TrainingService, UIService],

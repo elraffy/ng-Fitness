@@ -1,0 +1,191 @@
+//////////////////training reducer/////
+
+
+import { Action, createFeatureSelector, createSelector } from '@ngrx/store';
+import { TrainingActions, SET_AVAILABLE_TRAININGS, SET_FINISHED_TRAININGS, START_TRAINING, STOP_TRAINING } from './training.actions';
+import { Exercise } from './exercise.model';
+import * as fromRoot from '../../app.reducer';
+
+export interface TrainingState{
+  availableExercises : Exercise[];
+  finishedExercise: Exercise[];
+  activeTraining: Exercise;
+};
+
+export interface State extends fromRoot.State{
+  training: TrainingState;
+}
+
+const initialState : TrainingState = {
+  availableExercises : [],
+  finishedExercise: [],
+  activeTraining: null
+};
+
+export function trainingReducer(state = initialState, action: TrainingActions){
+      switch(action.type){
+        case SET_AVAILABLE_TRAININGS:
+          return {
+            ...state,
+            availableExercises : action.payload
+          };
+        case SET_FINISHED_TRAININGS:
+          return {
+            ...state,
+            finishedExercise: action.payload
+          };
+        case START_TRAINING:
+          return {
+            ...state,
+            asctiveTraining: {...state.availableExercises.find( ex => ex.id === action.payload)}
+          };
+        case STOP_TRAINING:
+            return {
+              ...state,
+            finishedExercise: null
+            };
+          default:{
+            return state;
+          }
+      }
+}
+
+export const  getTrainingState = createFeatureSelector<TrainingState>('training');
+
+export const  getAvailableExercises = createSelector(getTrainingState,(state : TrainingState ) => state.availableExercises);
+export const  getFinishedExercises = createSelector(getTrainingState,(state : TrainingState ) => state.finishedExercise);
+export const  getActiveTraining = createSelector(getTrainingState,(state : TrainingState ) => state.activeTraining);
+export const  getIsTraining = createSelector(getTrainingState,(state : TrainingState ) => state.activeTraining != null);
+
+
+
+
+////end trainin reducer//////
+
+////////////training actions//////
+import { Action } from '@ngrx/store';
+import { Exercise } from './exercise.model';
+
+export const SET_AVAILABLE_TRAININGS = '[Training] Set Available Trainings';
+export const SET_FINISHED_TRAININGS = '[Training] Set Finished Trainings';
+export const START_TRAINING  = '[Training] Start Training';
+export const STOP_TRAINING   = '[Training] Stop Training';
+
+export class SetAvailableTrainings implements Action{
+    readonly type = SET_AVAILABLE_TRAININGS;
+    constructor( public payload: Exercise[]){}
+}
+
+export class SetFinishedTrainings implements Action{
+  readonly type = SET_FINISHED_TRAININGS;
+  constructor( public payload: Exercise[]){}
+}
+
+export class StartTraining implements Action{
+  readonly type = START_TRAINING;
+  constructor( public payload: string){}
+}
+
+export class StopTraining implements Action{
+  readonly type = STOP_TRAINING;
+}
+
+export type TrainingActions = SetAvailableTrainings | SetFinishedTrainings | StartTraining | StopTraining;
+
+
+
+//////end training actions///////
+
+
+///////training service//
+import { Injectable } from '@angular/core';
+import { Exercise } from './exercise.model';
+import { Subject, Subscription } from 'rxjs';
+import { map} from 'rxjs/operators';
+import { AngularFirestore } from '@angular/fire/firestore';
+
+
+import { UIService } from '../../shared/ui.service';
+import { Store } from '@ngrx/store';
+import * as UI from '../../shared/ui.actions';
+import * as Training from './training.actions';
+import * as fromTraining from './training.reducer';
+import { SetFinishedTrainings } from './training.actions';
+
+
+@Injectable()
+export class TrainingService{
+  exerciseChanged = new Subject<Exercise>();
+  exercisesChanged = new Subject<Exercise[]>();  private availableExercises: Exercise[] = [];
+  finishedExercisesChanged = new Subject<Exercise[]>();
+  private runningExercise: Exercise;
+  private finishedExercises : Exercise [] = [];
+  private fbSubs: Subscription[] = [];
+
+  constructor( private db: AngularFirestore,
+              private uiService: UIService,
+              private store: Store<fromTraining.State> ){}
+
+  fetchAvailableExercises(){
+    this.store.dispatch( new UI.StartLoading());
+   this.fbSubs.push(this.db.collection('availableExercises')
+       .snapshotChanges().pipe(
+         map(docArray=>{
+           return docArray.map(doc=>{
+             return{
+               id: doc.payload.doc.id,
+               ...doc.payload.doc.data() as Exercise
+             };
+           });
+         })
+       ).subscribe((exercises: Exercise[]) =>{
+              this.store.dispatch( new UI.StopLoading());
+              this.store.dispatch( new Training.SetAvailableTrainings(exercises));
+       }, error => {
+           this.store.dispatch( new UI.StopLoading());
+           this.uiService.showSnarckbar('Fetching exercises failed, please try later', null, 300);
+           //this.exercisesChanged.next([...this.availableExercises])
+       }));
+  }
+  startExercise(selectedId: string){
+    this.store.dispatch(new Training.StartTraining(selectedId));
+       }
+
+  completeExercise(){
+    this.addDataToDatabase({...this.runningExercise,
+      date: new Date(),
+      state:'complete'});
+      this.store.dispatch(new Training.StopTraining());
+  }
+  cancelExercise( progress: number){
+    this.addDataToDatabase({...this.runningExercise,
+      //name: this.runningExercise.name,
+      duration: this.runningExercise.duration * (progress / 100),
+      calories: this.runningExercise.calories * (progress / 100),
+      date: new Date(),
+      state:'cancelled'});
+      this.store.dispatch( new Training.StopTraining());
+  }
+
+  getRunningExercise(){
+    return {...this.runningExercise}
+  }
+  fetchCompleteOrCancelledExercises(){
+   this.fbSubs.push( this.db.collection('finishedExercises')
+    .valueChanges()
+    .subscribe( (exercises: Exercise[]) =>{
+      this.store.dispatch( new Training.SetFinishedTrainings(exercises));
+    }));
+  }
+
+  cancelSubscriptions(){
+    this.fbSubs.forEach( subs => subs.unsubscribe());
+  }
+  private addDataToDatabase( exercise: Exercise){
+      this.db.collection('finishedExercises').add(exercise);
+  }
+}
+
+
+
+//////end training service////
